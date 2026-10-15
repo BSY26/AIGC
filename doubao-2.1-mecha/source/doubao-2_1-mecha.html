@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>豆包大模型 2.1 系列 | 作战档案</title>
+<style>
+  :root{
+    --void:#090c11;
+    --void-2:#0e1219;
+    --panel:#141a25;
+    --panel-2:#1b2230;
+    --armor:#eef1f6;
+    --armor-dim:#93a0b8;
+    --blue:#3d7de8;
+    --blue-dim:#1c3a63;
+    --blue-dark:#16233c;
+    --red:#e6392f;
+    --yellow:#f2b705;
+    --line:#2c3446;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+  html{scroll-behavior:smooth;}
+
+  body{
+    background:var(--void);
+    color:var(--armor);
+    font-family:'STKaiti','KaiTi','Kaiti SC','楷体',serif;
+    line-height:1.7;
+    overflow-x:hidden;
+  }
+
+  /* ===== 全局背景纹理:面板网格 + 扫描线 ===== */
+  .grid-bg{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    pointer-events:none;
+    background-image:
+      linear-gradient(rgba(61,125,232,0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(61,125,232,0.045) 1px, transparent 1px);
+    background-size:42px 42px;
+  }
+  .scan-bg{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    pointer-events:none;
+    background:repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.012) 0px,
+      rgba(255,255,255,0.012) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    opacity:0.5;
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .glow-sweep{
+      position:fixed;
+      top:0; left:-40%;
+      width:40%; height:100%;
+      background:linear-gradient(100deg, transparent, rgba(61,125,232,0.05), transparent);
+      animation:sweep 9s linear infinite;
+      pointer-events:none;
+      z-index:0;
+    }
+    @keyframes sweep{
+      0%{left:-40%;}
+      100%{left:120%;}
+    }
+  }
+
+  .wrap{position:relative;z-index:1;}
+
+  /* ===== 警戒斜纹条 ===== */
+  .warn-strip{
+    height:10px;
+    background:repeating-linear-gradient(
+      -45deg,
+      var(--yellow), var(--yellow) 12px,
+      #101010 12px, #101010 24px
+    );
+  }
+
+  /* ===== 顶部座舱状态栏 ===== */
+  .cockpit-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+    padding:14px 6vw;
+    background:var(--void-2);
+    border-bottom:1px solid var(--line);
+    font-size:0.85rem;
+    letter-spacing:1px;
+    color:var(--armor-dim);
+  }
+  .cockpit-bar .dot{
+    display:inline-block;
+    width:8px;height:8px;
+    border-radius:50%;
+    background:var(--blue);
+    margin-right:8px;
+    box-shadow:0 0 8px var(--blue);
+  }
+  .cockpit-bar span.tag{color:var(--yellow);}
+
+  /* ===== HUD 边角框 ===== */
+  .hud-frame{
+    position:relative;
+    border:1px solid var(--line);
+  }
+  .hud-frame::before,
+  .hud-frame::after,
+  .hud-frame .corner-tl,
+  .hud-frame .corner-br{
+    content:'';
+    position:absolute;
+    width:26px;height:26px;
+    pointer-events:none;
+  }
+  .hud-frame::before{
+    top:-1px; left:-1px;
+    border-top:3px solid var(--blue);
+    border-left:3px solid var(--blue);
+  }
+  .hud-frame::after{
+    bottom:-1px; right:-1px;
+    border-bottom:3px solid var(--blue);
+    border-right:3px solid var(--blue);
+  }
+
+  /* ===== HERO ===== */
+  .hero{
+    padding:8vw 6vw 6vw;
+    position:relative;
+  }
+  .hero-inner{
+    max-width:1100px;
+    margin:0 auto;
+    padding:60px 5vw;
+  }
+  .eyebrow-mark{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    font-size:0.95rem;
+    color:var(--yellow);
+    letter-spacing:3px;
+    margin-bottom:26px;
+  }
+  .eyebrow-mark::before{
+    content:'';
+    width:34px;height:2px;
+    background:var(--yellow);
+  }
+  h1.hero-title{
+    font-size:clamp(2.4rem, 6vw, 4.6rem);
+    color:var(--armor);
+    font-weight:700;
+    letter-spacing:2px;
+    text-shadow:0 0 24px rgba(61,125,232,0.35);
+  }
+  .hero-title .accent{color:var(--blue);}
+  .hero-sub{
+    margin-top:22px;
+    font-size:clamp(1.05rem,2vw,1.35rem);
+    color:var(--armor-dim);
+    max-width:34em;
+  }
+  .hero-meta{
+    margin-top:38px;
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .meta-chip{
+    border:1px solid var(--line);
+    background:var(--panel);
+    padding:9px 18px;
+    font-size:0.92rem;
+    color:var(--armor-dim);
+    clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  }
+  .meta-chip b{color:var(--armor);font-weight:600;}
+
+  .stat-rail{
+    margin-top:52px;
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+  }
+  .stat-rail div{
+    padding:22px 4px;
+    border-right:1px solid var(--line);
+  }
+  .stat-rail div:last-child{border-right:none;}
+  .stat-num{
+    font-size:clamp(1.6rem,3vw,2.3rem);
+    color:var(--blue);
+    font-weight:700;
+  }
+  .stat-label{
+    font-size:0.85rem;
+    color:var(--armor-dim);
+    margin-top:6px;
+    letter-spacing:1px;
+  }
+
+  /* ===== SECTION 通用 ===== */
+  section{
+    padding:70px 6vw;
+    max-width:1200px;
+    margin:0 auto;
+  }
+  .sec-head{
+    display:flex;
+    align-items:baseline;
+    gap:18px;
+    margin-bottom:44px;
+    border-left:4px solid var(--red);
+    padding-left:18px;
+  }
+  .sec-head .idx{
+    color:var(--red);
+    font-size:1rem;
+    letter-spacing:2px;
+  }
+  .sec-head h2{
+    font-size:clamp(1.5rem,3vw,2.1rem);
+    color:var(--armor);
+    letter-spacing:1px;
+  }
+  .sec-desc{
+    color:var(--armor-dim);
+    max-width:38em;
+    margin-bottom:40px;
+    font-size:1.02rem;
+  }
+
+  /* ===== 家族编队卡片 ===== */
+  .unit-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(340px,1fr));
+    gap:34px;
+  }
+  .unit-card{
+    background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--line);
+    clip-path:polygon(0 0,100% 0,100% calc(100% - 28px),calc(100% - 28px) 100%,0 100%);
+    padding:32px 30px 40px;
+    position:relative;
+    overflow:hidden;
+  }
+  .unit-card.pro{border-color:rgba(61,125,232,0.5);}
+  .unit-card.turbo{border-color:rgba(230,57,47,0.4);}
+  .unit-tag{
+    position:absolute;
+    top:0;right:0;
+    padding:6px 16px;
+    font-size:0.78rem;
+    letter-spacing:2px;
+    background:var(--blue-dark);
+    color:var(--blue);
+    clip-path:polygon(14px 0,100% 0,100% 100%,0 100%);
+  }
+  .unit-card.turbo .unit-tag{background:#3a1a17;color:var(--red);}
+  .unit-code{
+    font-size:0.95rem;
+    color:var(--armor-dim);
+    letter-spacing:3px;
+    margin-bottom:6px;
+  }
+  .unit-name{
+    font-size:1.9rem;
+    color:var(--armor);
+    font-weight:700;
+    margin-bottom:6px;
+  }
+  .unit-role{
+    color:var(--yellow);
+    font-size:0.98rem;
+    margin-bottom:20px;
+  }
+  .unit-desc{
+    color:var(--armor-dim);
+    font-size:0.98rem;
+    margin-bottom:24px;
+  }
+  .unit-specs{
+    display:grid;
+    gap:10px;
+    border-top:1px dashed var(--line);
+    padding-top:18px;
+  }
+  .unit-specs div{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.92rem;
+  }
+  .unit-specs span:first-child{color:var(--armor-dim);}
+  .unit-specs span:last-child{color:var(--armor);}
+
+  /* ===== 核心装备(能力评测) ===== */
+  .cap-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:30px;
+  }
+  .cap-card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    padding:30px 26px;
+  }
+  .hex{
+    width:52px;height:60px;
+    background:var(--blue-dark);
+    clip-path:polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--blue);
+    font-weight:700;
+    font-size:1.1rem;
+    margin-bottom:18px;
+  }
+  .cap-card h3{
+    color:var(--armor);
+    font-size:1.25rem;
+    margin-bottom:10px;
+  }
+  .cap-card p{
+    color:var(--armor-dim);
+    font-size:0.94rem;
+    margin-bottom:16px;
+  }
+  .bench-tags{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .bench-tags span{
+    border:1px solid var(--line);
+    color:var(--armor-dim);
+    font-size:0.8rem;
+    padding:4px 10px;
+    letter-spacing:0.5px;
+  }
+
+  /* ===== 任务日志(实战案例) ===== */
+  .log-list{
+    display:flex;
+    flex-direction:column;
+    gap:0;
+    border-top:1px solid var(--line);
+  }
+  .log-item{
+    display:grid;
+    grid-template-columns:110px 1fr;
+    gap:26px;
+    padding:28px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .log-id{
+    color:var(--red);
+    font-size:1rem;
+    letter-spacing:2px;
+  }
+  .log-item h3{
+    color:var(--armor);
+    font-size:1.15rem;
+    margin-bottom:8px;
+  }
+  .log-item p{
+    color:var(--armor-dim);
+    font-size:0.96rem;
+  }
+
+  /* ===== 补给成本(价格) ===== */
+  .price-table{
+    width:100%;
+    border-collapse:collapse;
+    border:1px solid var(--line);
+  }
+  .price-table th,.price-table td{
+    padding:16px 18px;
+    text-align:left;
+    border-bottom:1px solid var(--line);
+    font-size:0.96rem;
+  }
+  .price-table th{
+    background:var(--panel);
+    color:var(--yellow);
+    letter-spacing:1px;
+    font-weight:600;
+  }
+  .price-table td{color:var(--armor-dim);}
+  .price-table td.hl{color:var(--armor);font-weight:600;}
+  .price-note{
+    margin-top:18px;
+    font-size:0.88rem;
+    color:var(--armor-dim);
+  }
+
+  /* ===== 编队接入(生态) ===== */
+  .fleet-badges{
+    display:flex;
+    flex-wrap:wrap;
+    gap:16px;
+  }
+  .fleet-badges span{
+    border:1px solid var(--blue-dim);
+    background:var(--blue-dark);
+    color:var(--armor);
+    padding:12px 22px;
+    font-size:1rem;
+    letter-spacing:1px;
+    clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+  }
+
+  /* ===== 僚机编队(同期发布) ===== */
+  .wing-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+  }
+  .wing-card{
+    border:1px solid var(--line);
+    padding:20px;
+    background:var(--void-2);
+  }
+  .wing-card h4{color:var(--armor);font-size:1.05rem;margin-bottom:6px;}
+  .wing-card p{color:var(--armor-dim);font-size:0.88rem;}
+
+  footer{
+    border-top:1px solid var(--line);
+    padding:34px 6vw 50px;
+    text-align:center;
+    color:var(--armor-dim);
+    font-size:0.85rem;
+    letter-spacing:1px;
+  }
+  footer .dot{
+    display:inline-block;
+    width:7px;height:7px;
+    border-radius:50%;
+    background:var(--blue);
+    margin:0 8px;
+    box-shadow:0 0 6px var(--blue);
+  }
+
+  @media (max-width:640px){
+    .log-item{grid-template-columns:1fr;}
+    .stat-rail div{border-right:none;border-bottom:1px solid var(--line);}
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="scan-bg"></div>
+<div class="glow-sweep"></div>
+
+<div class="wrap">
+
+  <div class="warn-strip"></div>
+  <div class="cockpit-bar">
+    <div><span class="dot"></span>系统在线 · 豆包大模型作战数据链接入完成</div>
+    <div><span class="tag">档案编号</span> DB-SEED-2.1 · 发布日期 2026.06.23</div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-inner hud-frame">
+      <div class="eyebrow-mark">火山引擎 · 2026 夏季 FORCE 原动力大会 · 北京</div>
+      <h1 class="hero-title">豆包大模型<br><span class="accent">2.1</span> 作战系列</h1>
+      <p class="hero-sub">
+        编程、智能体、多模态三条战线同步跃升,官方称其正式跨越"生产级质变点"——
+        这是继上一代之后,第一支真正具备规模化实战交付能力的量产机型编队。
+      </p>
+      <div class="hero-meta">
+        <div class="meta-chip">核心方向 <b>Coding · Agent · VLM</b></div>
+        <div class="meta-chip">机型编队 <b>2.1 Pro / 2.1 Turbo</b></div>
+        <div class="meta-chip">部署入口 <b>火山引擎 API</b></div>
+      </div>
+
+      <div class="stat-rail">
+        <div>
+          <div class="stat-num">180万亿</div>
+          <div class="stat-label">日均 Token 调用量</div>
+        </div>
+        <div>
+          <div class="stat-num">10倍+</div>
+          <div class="stat-label">近一年调用量增速</div>
+        </div>
+        <div>
+          <div class="stat-num">49.5%</div>
+          <div class="stat-label">中国公有云 MaaS 市场份额(IDC)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 家族编队 -->
+  <section id="family">
+    <div class="sec-head">
+      <span class="idx">01</span>
+      <h2>家族编队 · 机型总览</h2>
+    </div>
+    <p class="sec-desc">
+      2.1 系列由两台量产机构成,分别面向旗舰级复杂任务与高频规模化调用场景,
+      共同覆盖从科研攻坚到日常办公的全部作战半径。
+    </p>
+    <div class="unit-grid">
+      <div class="unit-card pro hud-frame">
+        <span class="unit-tag">旗舰机</span>
+        <div class="unit-code">MS-2.1-PRO</div>
+        <div class="unit-name">豆包 2.1 Pro</div>
+        <div class="unit-role">主力舰 · 生产级质变点机型</div>
+        <p class="unit-desc">
+          本次编队的主力机型,在编程、智能体、视觉语言三大方向实现能力跃升,
+          多项权威评测进入全球第一梯队,官方将其定义为首批跨越"生产级质变点"的国产机型之一。
+        </p>
+        <div class="unit-specs">
+          <div><span>输入定价</span><span>6 元 / 百万 Token</span></div>
+          <div><span>输出定价</span><span>30 元 / 百万 Token</span></div>
+          <div><span>缓存命中价</span><span>1.2 元 / 百万 Token</span></div>
+        </div>
+      </div>
+
+      <div class="unit-card turbo hud-frame">
+        <span class="unit-tag">量产机</span>
+        <div class="unit-code">MS-2.1-TURBO</div>
+        <div class="unit-name">豆包 2.1 Turbo</div>
+        <div class="unit-role">先锋机 · 高频规模化部署</div>
+        <p class="unit-desc">
+          面向高频调用场景打造的轻量化机型,定价约为 Pro 型号的一半,
+          在保持均衡作战能力的同时大幅压低单次出击成本,是豆包 App 免费用户所搭载的基础机型。
+        </p>
+        <div class="unit-specs">
+          <div><span>定价策略</span><span>较 Pro 再降约一半</span></div>
+          <div><span>定位场景</span><span>高频、低时延调用</span></div>
+          <div><span>综合能力</span><span>效果比肩旗舰 Pro</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 核心装备 -->
+  <section id="capability">
+    <div class="sec-head">
+      <span class="idx">02</span>
+      <h2>核心装备 · 三线作战评测</h2>
+    </div>
+    <p class="sec-desc">
+      官方披露的评测数据集中在三条战线,每条战线均对应一套权威测评体系。
+    </p>
+    <div class="cap-grid">
+      <div class="cap-card hud-frame">
+        <div class="hex">C</div>
+        <h3>Coding 编程</h3>
+        <p>在终端与工程化代码评测中进入第一梯队,具备连续数小时不间断的工程交付能力。</p>
+        <div class="bench-tags">
+          <span>Terminal Bench 2.1</span>
+          <span>SWE-Pro</span>
+          <span>SciCode</span>
+        </div>
+      </div>
+      <div class="cap-card hud-frame">
+        <div class="hex">A</div>
+        <h3>Agent 智能体</h3>
+        <p>可完成多智能体协同、长链路工具调用等复杂任务编排,评测成绩位居全球前列。</p>
+        <div class="bench-tags">
+          <span>OSWorld</span>
+          <span>MobileWorld</span>
+        </div>
+      </div>
+      <div class="cap-card hud-frame">
+        <div class="hex">V</div>
+        <h3>VLM 视觉语言</h3>
+        <p>图形界面理解与图像理解能力同步提升,在多模态权威测评中表现优异。</p>
+        <div class="bench-tags">
+          <span>MMMU-Pro</span>
+          <span>GUI 理解</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 实战任务日志 -->
+  <section id="missions">
+    <div class="sec-head">
+      <span class="idx">03</span>
+      <h2>任务日志 · 实战案例</h2>
+    </div>
+    <div class="log-list">
+      <div class="log-item">
+        <div class="log-id">任务 01</div>
+        <div>
+          <h3>芯片设计 RTL 全流程攻坚</h3>
+          <p>连续运行近 18 小时,历经 9 轮迭代,完整跑通仿真、测试、综合检查等工程环节,
+          在真实芯片设计场景中展现生产级交付能力。</p>
+        </div>
+      </div>
+      <div class="log-item">
+        <div class="log-id">任务 02</div>
+        <div>
+          <h3>3D 虚拟城市多智能体协同</h3>
+          <p>依托模型搭建虚拟城市场景,实现 500 余个智能体同步协作,
+          完成上千轮工具调用,最终生成超百栋建筑。</p>
+        </div>
+      </div>
+      <div class="log-item">
+        <div class="log-id">任务 03</div>
+        <div>
+          <h3>个人办公场景延伸</h3>
+          <p>在豆包 App 与电脑端的办公任务模式下,模型可自主拆解工作目标,
+          调用本地文档、表格、网页等工具持续执行,交付完整工作成果,
+          覆盖代码调试、数据处理、方案输出等环节。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 补给成本 -->
+  <section id="pricing">
+    <div class="sec-head">
+      <span class="idx">04</span>
+      <h2>补给成本 · 部署定价</h2>
+    </div>
+    <table class="price-table">
+      <thead>
+        <tr>
+          <th>机型</th>
+          <th>输入 / 百万 Token</th>
+          <th>输出 / 百万 Token</th>
+          <th>缓存命中价</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="hl">豆包 2.1 Pro</td>
+          <td>6 元</td>
+          <td>30 元</td>
+          <td>1.2 元</td>
+        </tr>
+        <tr>
+          <td class="hl">豆包 2.1 Turbo</td>
+          <td>约为 Pro 一半</td>
+          <td>约为 Pro 一半</td>
+          <td>同步下调</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="price-note">注:综合使用成本较对标的海外顶尖机型下降明显,具体以火山引擎官方计费为准。</p>
+  </section>
+
+  <!-- 编队接入 -->
+  <section id="fleet">
+    <div class="sec-head">
+      <span class="idx">05</span>
+      <h2>编队接入 · 已开放舰桥</h2>
+    </div>
+    <div class="fleet-badges">
+      <span>豆包 App</span>
+      <span>豆包 PC 端</span>
+      <span>TRAE</span>
+      <span>扣子 Coze</span>
+      <span>火山引擎 API</span>
+    </div>
+  </section>
+
+  <!-- 僚机编队 -->
+  <section id="wingmen">
+    <div class="sec-head">
+      <span class="idx">06</span>
+      <h2>僚机编队 · 同期发布机型</h2>
+    </div>
+    <p class="sec-desc">同一场发布会上,火山引擎还集中投放了视频、图像、音频方向的僚机型号。</p>
+    <div class="wing-grid">
+      <div class="wing-card">
+        <h4>Seedance 2.5</h4>
+        <p>新一代视频生成模型</p>
+      </div>
+      <div class="wing-card">
+        <h4>Seedance 2.0</h4>
+        <p>升级支持原生 4K 视频生成</p>
+      </div>
+      <div class="wing-card">
+        <h4>Seedream 5.0 Pro</h4>
+        <p>图像创作模型</p>
+      </div>
+      <div class="wing-card">
+        <h4>Seed-Audio 1.0</h4>
+        <p>音频生成模型</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    豆包大模型 2.1 作战档案<span class="dot"></span>数据来源:火山引擎 2026 夏季 FORCE 原动力大会公开信息<span class="dot"></span>页面仅作资料整理展示
+  </footer>
+
+</div>
+
+</body>
+</html>
